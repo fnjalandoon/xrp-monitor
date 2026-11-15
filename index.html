@@ -30,7 +30,7 @@
 <body>
 <header>
   <h1>XRP Price Monitor</h1>
-  <p>XRP in US dollars, checked every 15 minutes</p>
+  <p>XRP in US dollars. Live price on every refresh.</p>
 </header>
 <main>
   <div class="card" id="now">Loading...</div>
@@ -49,6 +49,25 @@ const get = u => fetch(u + "?" + Date.now()).then(r => { if (!r.ok) throw new Er
 
 Promise.all([get("xrp_data.json"), get("xrp_daily.json").catch(() => null)]).then(([d, daily]) => {
   const z = ZONES[d.zone] || ZONES.hold;
+  let live = null, cur = "7D";
+  const when = t => new Date(t*1000).toLocaleTimeString("en-PH",{timeZone:"Asia/Manila",hour:"numeric",minute:"2-digit"});
+  const SRC = [
+    ["Coinbase", "https://api.coinbase.com/v2/prices/XRP-USD/spot", j => +j.data.amount],
+    ["Kraken", "https://api.kraken.com/0/public/Ticker?pair=XRPUSD", j => +Object.values(j.result)[0].c[0]],
+    ["CoinGecko", "https://api.coingecko.com/api/v3/simple/price?ids=ripple&vs_currencies=usd", j => +j.ripple.usd],
+  ];
+  async function fetchLive() {
+    for (const [name, url, parse] of SRC) {
+      try {
+        const ctl = new AbortController(), timer = setTimeout(() => ctl.abort(), 8000);
+        const r = await fetch(url, {cache:"no-store", signal:ctl.signal}); clearTimeout(timer);
+        if (!r.ok) continue;
+        const v = parse(await r.json());
+        if (v > 0.01 && v < 100) return {price:v, source:name, t:Date.now()/1000};
+      } catch (e) {}
+    }
+    return null;
+  }
   const dayRows = daily ? Object.entries(daily.days).map(([k, r]) => [Date.parse(k + "T00:00:00Z")/1000, r]) : [];
 
   // Each range gives: series [[t, price]], low, high, start price
@@ -79,12 +98,14 @@ Promise.all([get("xrp_data.json"), get("xrp_daily.json").catch(() => null)]).the
 
   function show(name) {
     const R = ranges[name](); if (!R) return;
-    const chg = (d.price - R.start) / R.start * 100, up = chg >= 0;
+    cur = name; const P = live ? live.price : d.price, lo = Math.min(R.lo, P), hi = Math.max(R.hi, P);
+    const chg = (P - R.start) / R.start * 100, up = chg >= 0;
     document.getElementById("now").innerHTML =
-      `<div class="price">${usd(d.price)}</div><span class="zone" style="background:${z[1]};color:${z[2]}">${z[0]}</span>
+      `<div class="price">${usd(P)}</div><span class="zone" style="background:${z[1]};color:${z[2]}">${z[0]}</span>
        <div class="row"><div>${name} change<b style="color:${up?'#2e9e5b':'#c92a2a'}">${up?'+':''}${chg.toFixed(2)}%</b></div>
-       <div>${name} low<b>${usd(R.lo)}</b></div><div>${name} high<b>${usd(R.hi)}</b></div></div>
-       <div class="sub">Source: ${d.source}. Your buy and sell prices are kept private in the repo settings.</div>`;
+       <div>${name} low<b>${usd(lo)}</b></div><div>${name} high<b>${usd(hi)}</b></div></div>
+       <div class="sub">${live ? `Live price from ${live.source} at ${when(live.t)} PHT.` : `Last saved check at ${when(d.updated)} PHT. Live price not available right now.`}</div>
+       <div class="sub">The zone shown is from the last saved check at ${when(d.updated)} PHT, since your buy and sell prices are kept private. Alerts are sent by the scheduled check, not by this page.</div>`;
     document.getElementById("chart").innerHTML = chart(R);
     document.getElementById("note").textContent = R.note;
     [...document.querySelectorAll("#tabs button")].forEach(b => b.classList.toggle("on", b.textContent === name));
@@ -94,6 +115,8 @@ Promise.all([get("xrp_data.json"), get("xrp_daily.json").catch(() => null)]).the
   Object.keys(ranges).forEach(n => { if (!ranges[n]()) return;
     const b = document.createElement("button"); b.textContent = n; b.onclick = () => show(n); tabs.appendChild(b); });
   show("7D");
+  const refresh = async () => { const l = await fetchLive(); if (l) live = l; show(cur); };
+  refresh(); setInterval(refresh, 30000);
   document.getElementById("foot").textContent = "Updated " + new Date(d.updated*1000).toLocaleString("en-PH",{timeZone:"Asia/Manila"}) + " PHT. Information only, not financial advice.";
 }).catch(e => document.getElementById("now").textContent = "No data yet. It appears after the first check runs. (" + e + ")");
 </script>
