@@ -21,6 +21,9 @@
   .row b { display:block; font-size:18px; color:#1b1f2a; margin-top:2px; }
   h2 { font-size:15px; margin:0 0 10px; color:var(--navy); }
   a { color:var(--navy); }
+  .tabs { display:flex; gap:8px; margin-bottom:12px; }
+  .tabs button { flex:1; padding:9px 0; border:1px solid #d3d8e6; background:#fff; color:#001E62; border-radius:10px; font-size:14px; font-weight:bold; }
+  .tabs button.on { background:#001E62; color:#fff; border-color:#001E62; }
   footer { text-align:center; font-size:12px; color:#7a8090; padding:8px 16px 28px; }
 </style>
 </head>
@@ -31,34 +34,66 @@
 </header>
 <main>
   <div class="card" id="now">Loading...</div>
-  <div class="card"><h2>Last 7 days</h2><div id="chart"></div></div>
+  <div class="card">
+    <div class="tabs" id="tabs"></div>
+    <div id="chart"></div>
+    <div class="sub" id="note"></div>
+  </div>
 </main>
 <footer id="foot"></footer>
 <script>
 const ZONES = {buy:["Buy opportunity","#2e9e5b","#fff"], sell:["Sell zone","#c92a2a","#fff"], hold:["Hold, between your prices","#d9dce3","#1b1f2a"]};
 const usd = v => "$" + v.toFixed(4);
-fetch("xrp_data.json?" + Date.now()).then(r => r.json()).then(d => {
-  const pts = d.points, z = ZONES[d.zone] || ZONES.hold;
-  const day = pts.filter(p => p[0] >= d.updated - 86400);
-  const first = day.length ? day[0][1] : d.price, chg = (d.price - first) / first * 100;
-  const hi = Math.max(...pts.map(p => p[1])), lo = Math.min(...pts.map(p => p[1]));
-  document.getElementById("now").innerHTML =
-    `<div class="price">${usd(d.price)}</div><span class="zone" style="background:${z[1]};color:${z[2]}">${z[0]}</span>
-     <div class="row"><div>24h change<b style="color:${chg>=0?'#2e9e5b':'#c92a2a'}">${chg>=0?'+':''}${chg.toFixed(2)}%</b></div>
-     <div>7-day low<b>${usd(lo)}</b></div><div>7-day high<b>${usd(hi)}</b></div></div>
-     <div class="sub">Source: ${d.source}. Your buy and sell prices are kept private in the repo settings.</div>`;
+const mdy = (t, o) => new Date(t*1000).toLocaleDateString("en-US", Object.assign({timeZone:"UTC"}, o));
+const get = u => fetch(u + "?" + Date.now()).then(r => { if (!r.ok) throw new Error(u); return r.json(); });
 
-  const W = 660, H = 220, pad = 40, t0 = pts[0][0], t1 = pts[pts.length-1][0] || t0 + 1;
-  const min = lo * 0.995, max = hi * 1.005;
-  const x = t => pad + (t - t0) / Math.max(1, t1 - t0) * (W - pad - 6);
-  const y = v => H - 22 - (v - min) / Math.max(1e-9, max - min) * (H - 40);
-  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="XRP price, last 7 days">`;
-  [min, (min+max)/2, max].forEach(v => svg += `<line x1="${pad}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#e3e6ee"/><text x="0" y="${y(v)+4}" font-size="11" fill="#5a6070">${v.toFixed(3)}</text>`);
-  svg += `<polyline fill="none" stroke="#001E62" stroke-width="2" points="${pts.map(p => x(p[0]).toFixed(1)+","+y(p[1]).toFixed(1)).join(" ")}"/>`;
-  svg += `<circle cx="${x(t1)}" cy="${y(d.price)}" r="4" fill="${z[1]}"/>`;
-  [0, 1, 2, 3, 4].forEach(i => { const t = t0 + (t1 - t0) * i / 4;
-    svg += `<text x="${x(t)}" y="${H-6}" font-size="10" text-anchor="${i==0?'start':i==4?'end':'middle'}" fill="#5a6070">${new Date(t*1000).toLocaleDateString("en-US",{month:"short",day:"numeric",timeZone:"Asia/Manila"})}</text>`; });
-  document.getElementById("chart").innerHTML = svg + "</svg>";
+Promise.all([get("xrp_data.json"), get("xrp_daily.json").catch(() => null)]).then(([d, daily]) => {
+  const z = ZONES[d.zone] || ZONES.hold;
+  const dayRows = daily ? Object.entries(daily.days).map(([k, r]) => [Date.parse(k + "T00:00:00Z")/1000, r]) : [];
+
+  // Each range gives: series [[t, price]], low, high, start price
+  const ranges = {
+    "7D": () => { const p = d.points; return {s:p, lo:Math.min(...p.map(x=>x[1])), hi:Math.max(...p.map(x=>x[1])), start:p[0][1], fmt:t=>mdy(t,{month:"short",day:"numeric"}), note:"Every 15 minutes."}; },
+    "30D": () => daily && dayRows.length >= 2 ? fromDaily(30, "Daily closes (UTC days).", t=>mdy(t,{month:"short",day:"numeric"})) : null,
+    "1Y":  () => daily && dayRows.length >= 2 ? fromDaily(365, "Daily closes (UTC days).", t=>mdy(t,{month:"short",year:"2-digit"})) : null,
+  };
+  function fromDaily(n, note, fmt) {
+    const rows = dayRows.slice(-n);
+    return {s: rows.map(([t,r]) => [t, r.c]), lo: Math.min(...rows.map(([t,r]) => r.l)), hi: Math.max(...rows.map(([t,r]) => r.h)),
+            start: rows[0][1].o, fmt, note: note + (rows.length < n ? ` Only ${rows.length} days available so far.` : "")};
+  }
+
+  function chart(R) {
+    const pts = R.s, W = 660, H = 220, pad = 44, t0 = pts[0][0], t1 = pts[pts.length-1][0];
+    const lo = Math.min(...pts.map(p=>p[1])), hi = Math.max(...pts.map(p=>p[1])), min = lo*0.99, max = hi*1.01;
+    const x = t => pad + (t - t0) / Math.max(1, t1 - t0) * (W - pad - 8);
+    const y = v => H - 22 - (v - min) / Math.max(1e-9, max - min) * (H - 40);
+    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="XRP price chart">`;
+    [min, (min+max)/2, max].forEach(v => svg += `<line x1="${pad}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#e3e6ee"/><text x="0" y="${y(v)+4}" font-size="11" fill="#5a6070">${v.toFixed(3)}</text>`);
+    svg += `<polyline fill="none" stroke="#001E62" stroke-width="2" stroke-linejoin="round" points="${pts.map(p => x(p[0]).toFixed(1)+","+y(p[1]).toFixed(1)).join(" ")}"/>`;
+    svg += `<circle cx="${x(t1)}" cy="${y(pts[pts.length-1][1])}" r="4" fill="${z[1]}"/>`;
+    for (let i = 0; i < 5; i++) { const t = t0 + (t1 - t0) * i / 4;
+      svg += `<text x="${x(t)}" y="${H-6}" font-size="10" text-anchor="${i==0?'start':i==4?'end':'middle'}" fill="#5a6070">${R.fmt(t)}</text>`; }
+    return svg + "</svg>";
+  }
+
+  function show(name) {
+    const R = ranges[name](); if (!R) return;
+    const chg = (d.price - R.start) / R.start * 100, up = chg >= 0;
+    document.getElementById("now").innerHTML =
+      `<div class="price">${usd(d.price)}</div><span class="zone" style="background:${z[1]};color:${z[2]}">${z[0]}</span>
+       <div class="row"><div>${name} change<b style="color:${up?'#2e9e5b':'#c92a2a'}">${up?'+':''}${chg.toFixed(2)}%</b></div>
+       <div>${name} low<b>${usd(R.lo)}</b></div><div>${name} high<b>${usd(R.hi)}</b></div></div>
+       <div class="sub">Source: ${d.source}. Your buy and sell prices are kept private in the repo settings.</div>`;
+    document.getElementById("chart").innerHTML = chart(R);
+    document.getElementById("note").textContent = R.note;
+    [...document.querySelectorAll("#tabs button")].forEach(b => b.classList.toggle("on", b.textContent === name));
+  }
+
+  const tabs = document.getElementById("tabs");
+  Object.keys(ranges).forEach(n => { if (!ranges[n]()) return;
+    const b = document.createElement("button"); b.textContent = n; b.onclick = () => show(n); tabs.appendChild(b); });
+  show("7D");
   document.getElementById("foot").textContent = "Updated " + new Date(d.updated*1000).toLocaleString("en-PH",{timeZone:"Asia/Manila"}) + " PHT. Information only, not financial advice.";
 }).catch(e => document.getElementById("now").textContent = "No data yet. It appears after the first check runs. (" + e + ")");
 </script>

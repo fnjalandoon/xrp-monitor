@@ -31,5 +31,5 @@ jobs:
         run: |
           git config user.name "xrp-bot"
           git config user.email "xrp-bot@users.noreply.github.com"
-          [ -f xrp_data.json ] && git add xrp_data.json || true
+          for f in xrp_data.json xrp_daily.json; do [ -f "$f" ] && git add "$f"; done || true
           git diff --cached --quiet || (git commit -m "Update XRP data" && git pull --rebase -q && git push)

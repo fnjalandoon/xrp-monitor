@@ -13,9 +13,12 @@ import os
 import sys
 import time
 import urllib.request
+from datetime import datetime, timezone
 from pathlib import Path
 
 DATA = Path("xrp_data.json")
+DAILY = Path("xrp_daily.json")
+KEEP_DAYS = 800
 KEEP_SECONDS = 7 * 24 * 3600
 HYSTERESIS = 0.01  # price must move 1% back past a line before the zone resets
 
@@ -48,6 +51,55 @@ def fetch_price():
         except Exception as e:  # try the next source
             errors.append(f"{name}: {e}")
     raise RuntimeError("No price source worked: " + "; ".join(errors))
+
+
+def utc_day(ts):
+    return datetime.fromtimestamp(ts, timezone.utc).strftime("%Y-%m-%d")
+
+
+def backfill_days():
+    """Daily candles (UTC days) for roughly the last year. Kraken first, CoinGecko as fallback."""
+    out = {}
+    try:
+        j = http_json("https://api.kraken.com/0/public/OHLC?pair=XRPUSD&interval=1440")
+        rows = next(v for k, v in j["result"].items() if k != "last")
+        for t, o, h, l, c, *_ in rows:
+            out[utc_day(int(t))] = {"o": round(float(o), 4), "h": round(float(h), 4),
+                                    "l": round(float(l), 4), "c": round(float(c), 4)}
+        if len(out) > 300:
+            return out
+    except Exception as e:
+        print("Kraken history failed:", e)
+    j = http_json("https://api.coingecko.com/api/v3/coins/ripple/market_chart"
+                  "?vs_currency=usd&days=365&interval=daily")
+    out = {}
+    for ms, p in j["prices"]:
+        v = round(float(p), 4)
+        out[utc_day(int(ms / 1000))] = {"o": v, "h": v, "l": v, "c": v}
+    return out
+
+
+def update_daily(price, now):
+    d = json.loads(DAILY.read_text()) if DAILY.exists() else {"days": {}}
+    days = d["days"]
+    today = utc_day(now)
+    if not d.get("backfilled"):
+        try:
+            for day, rec in backfill_days().items():
+                if day != today:
+                    days[day] = rec
+            d["backfilled"] = True
+            print(f"History backfilled: {len(days)} days")
+        except Exception as e:
+            print("History backfill failed, will retry next run:", e)
+    rec = days.get(today)
+    p = round(price, 4)
+    if rec is None:
+        days[today] = {"o": p, "h": p, "l": p, "c": p}
+    else:
+        rec["h"], rec["l"], rec["c"] = max(rec["h"], p), min(rec["l"], p), p
+    d["days"] = dict(sorted(days.items())[-KEEP_DAYS:])
+    DAILY.write_text(json.dumps(d, separators=(",", ":")))
 
 
 def decide_zone(price, buy, sell, prev):
@@ -123,6 +175,10 @@ def main():
     data.update({"price": round(price, 4), "source": source, "zone": zone,
                  "alerted_zone": alerted, "updated": now})
     DATA.write_text(json.dumps(data, separators=(",", ":")))
+    try:
+        update_daily(price, now)
+    except Exception as e:  # never let history problems block alerts
+        print("Daily history update failed:", e)
     return 0
 
 
