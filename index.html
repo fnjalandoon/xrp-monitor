@@ -43,6 +43,10 @@
   .chip.buy { background:#e3f4ea; color:#1d6b3d; }
   .chip.sell { background:#fbe5e5; color:#9b1c1c; }
   .chip.neutral { background:#eceef4; color:#454b5a; }
+  .chip.up { background:#2e9e5b; color:#fff; }
+  .chip.down { background:#c92a2a; color:#fff; }
+  .chip.gold { background:#FFC72C; color:#001E62; }
+  .chip.dark { background:#2b2f3a; color:#fff; }
   .gauge { position:relative; height:10px; border-radius:5px; margin:8px 0 2px; background:linear-gradient(90deg,#c9cfe0,#eceef4 50%,#c9cfe0); }
   .gauge s { position:absolute; top:-4px; width:4px; height:18px; margin-left:-2px; background:var(--ink); border-radius:2px; text-decoration:none; }
   .gscale { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); }
@@ -273,14 +277,14 @@ Promise.all([get("xrp_data.json"), get("xrp_daily.json").catch(() => null), get(
     let h = "";
     if (ma200 != null) {
       const up = P >= ma200, dist = (P / ma200 - 1) * 100;
-      h += row("Trend (200-day average)", chip("neutral", up ? "↑ Uptrend" : "↓ Downtrend"),
+      h += row("Trend (200-day average)", chip(up ? "up" : "down", up ? "↑ Uptrend" : "↓ Downtrend"),
         `Price is ${Math.abs(dist).toFixed(1)}% ${up ? "above" : "below"} the 200-day average of ${usd(ma200)}.`,
         "The 200-day average shows the long-term direction. Above it is usually read as an uptrend, below it as a downtrend.");
     }
     if (ma50 != null && ma200 != null) {
       const golden = ma50 >= ma200; let since = null;
       for (let i = L; i > 0; i--) { const a = D.ma50[i-1], c = D.ma200[i-1]; if (a == null || c == null) break; if ((a >= c) !== golden) { since = D.rows[i].t; break; } }
-      h += row("50-day vs 200-day average", chip("neutral", golden ? "Golden cross" : "Death cross"),
+      h += row("50-day vs 200-day average", chip(golden ? "gold" : "dark", golden ? "★ Golden cross" : "✖ Death cross"),
         `The 50-day average (${usd(ma50)}) is ${golden ? "above" : "below"} the 200-day average (${usd(ma200)})` + (since ? ` since ${mdy(since, {month:"short", day:"numeric", year:"numeric"})}.` : "."),
         golden ? "A golden cross is often read as a sign of strength." : "A death cross is often read as a sign of weakness.");
     }
@@ -302,7 +306,7 @@ Promise.all([get("xrp_data.json"), get("xrp_daily.json").catch(() => null), get(
       const b7 = bc.length >= 8 ? pctChg(bc[bc.length-1], bc[bc.length-8]) : null, b30 = bc.length >= 31 ? pctChg(bc[bc.length-1], bc[bc.length-31]) : null;
       if (x7 != null && b7 != null) {
         const diff = x7 - b7, tag = Math.abs(diff) < 2 ? "Moving with BTC" : diff < 0 ? "Weaker than BTC" : "Stronger than BTC";
-        h += row("Compared with Bitcoin", chip("neutral", tag),
+        h += row("Compared with Bitcoin", chip(Math.abs(diff) < 2 ? "neutral" : diff < 0 ? "down" : "up", tag),
           `7 days: XRP ${sgn(x7)}, Bitcoin ${sgn(b7)}.` + (x30 != null && b30 != null ? ` 30 days: XRP ${sgn(x30)}, Bitcoin ${sgn(b30)}.` : ""),
           "XRP often follows Bitcoin. This shows whether a move is about XRP itself or the whole crypto market.");
       }
