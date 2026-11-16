@@ -23,6 +23,7 @@ jobs:
         env:
           XRP_BUY_BELOW: ${{ vars.XRP_BUY_BELOW }}
           XRP_SELL_ABOVE: ${{ vars.XRP_SELL_ABOVE }}
+          XRP_INDICATOR_ALERTS: ${{ vars.XRP_INDICATOR_ALERTS }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           XRP_TEST_NOTIFY: ${{ inputs.test_notification && '1' || '' }}
         run: python3 xrp_check.py
@@ -31,5 +32,5 @@ jobs:
         run: |
           git config user.name "xrp-bot"
           git config user.email "xrp-bot@users.noreply.github.com"
-          for f in xrp_data.json xrp_daily.json; do [ -f "$f" ] && git add "$f"; done || true
+          for f in xrp_data.json xrp_daily.json xrp_market.json; do [ -f "$f" ] && git add "$f"; done || true
           git diff --cached --quiet || (git commit -m "Update XRP data" && git pull --rebase -q && git push)

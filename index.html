@@ -5,52 +5,122 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>XRP Price Monitor</title>
 <style>
-  :root { --navy:#001E62; }
+  :root { --navy:#001E62; --gold:#FFC72C; --ink:#1b1f2a; --muted:#5a6070; --soft:#f1f3f8; }
   * { box-sizing:border-box; }
-  body { margin:0; font-family:Arial,Helvetica,sans-serif; background:#f6f7fb; color:#1b1f2a; }
-  header { background:var(--navy); color:#fff; padding:18px 16px; }
+  body { margin:0; font-family:Arial,Helvetica,sans-serif; background:#f6f7fb; color:var(--ink); }
+  header { background:var(--navy); color:#fff; padding:18px 16px; border-bottom:4px solid var(--gold); }
   header h1 { margin:0; font-size:20px; }
   header p { margin:4px 0 0; font-size:13px; color:#cfd6ee; }
   main { max-width:720px; margin:0 auto; padding:16px; }
   .card { background:#fff; border-radius:14px; padding:16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(0,0,0,.08); }
   .price { font-size:52px; font-weight:bold; line-height:1; }
-  .zone { display:inline-block; margin-top:10px; padding:6px 14px; border-radius:999px; font-weight:bold; font-size:15px; }
-  .sub { font-size:13px; color:#5a6070; margin-top:8px; }
+  .zone { display:inline-block; margin-top:10px; padding:7px 16px; border-radius:999px; font-weight:bold; font-size:17px; }
+  .nfa { display:inline-block; margin-left:6px; font-size:12px; color:var(--muted); vertical-align:middle; }
+  .verdict { margin-top:10px; font-size:15px; line-height:1.4; }
+  .sub { font-size:13px; color:var(--muted); margin-top:8px; line-height:1.4; }
   .row { display:flex; gap:10px; margin-top:12px; }
-  .row div { flex:1; background:#f1f3f8; border-radius:10px; padding:10px; text-align:center; font-size:12px; color:#5a6070; }
-  .row b { display:block; font-size:18px; color:#1b1f2a; margin-top:2px; }
-  h2 { font-size:15px; margin:0 0 10px; color:var(--navy); }
-  a { color:var(--navy); }
-  .tabs { display:flex; gap:8px; margin-bottom:12px; }
-  .tabs button { flex:1; padding:9px 0; border:1px solid #d3d8e6; background:#fff; color:#001E62; border-radius:10px; font-size:14px; font-weight:bold; }
-  .tabs button.on { background:#001E62; color:#fff; border-color:#001E62; }
-  footer { text-align:center; font-size:12px; color:#7a8090; padding:8px 16px 28px; }
+  .row div { flex:1; background:var(--soft); border-radius:10px; padding:10px; text-align:center; font-size:12px; color:var(--muted); }
+  .row b { display:block; font-size:18px; color:var(--ink); margin-top:2px; }
+  h2 { font-size:16px; margin:0 0 10px; color:var(--navy); }
+  .tabs { display:flex; gap:8px; margin-bottom:10px; }
+  .tabs button { flex:1; padding:9px 0; border:1px solid #d3d8e6; background:#fff; color:var(--navy); border-radius:10px; font-size:14px; font-weight:bold; }
+  .tabs button.on { background:var(--navy); color:#fff; border-color:var(--navy); }
+  .legend { display:flex; flex-wrap:wrap; gap:6px 14px; font-size:12px; color:var(--muted); margin-bottom:6px; }
+  .legend span { display:inline-flex; align-items:center; gap:5px; }
+  .legend i { display:inline-block; width:18px; height:0; border-top:2px solid; }
+  .legend i.band { height:10px; border:0; background:rgba(59,91,219,.14); border-radius:2px; }
+  .legend i.dash { border-top-style:dashed; }
+  .plot { position:relative; touch-action:pan-y; }
+  .tip { position:absolute; top:0; pointer-events:none; background:#fff; border:1px solid #d3d8e6; border-radius:8px; padding:7px 9px; font-size:12px; line-height:1.45; box-shadow:0 2px 8px rgba(0,0,0,.12); display:none; white-space:nowrap; z-index:2; }
+  .tip b { color:var(--ink); }
+  .ind { border-top:1px solid #eceef4; padding:12px 0; }
+  .ind:first-of-type { border-top:0; padding-top:2px; }
+  .ind .top { display:flex; justify-content:space-between; align-items:center; gap:8px; }
+  .ind .name { font-weight:bold; font-size:15px; }
+  .ind .val { font-size:14px; margin-top:4px; }
+  .ind .why { font-size:12px; color:var(--muted); margin-top:3px; line-height:1.4; }
+  .chip { flex:none; font-size:12px; font-weight:bold; padding:4px 10px; border-radius:999px; }
+  .chip.buy { background:#e3f4ea; color:#1d6b3d; }
+  .chip.sell { background:#fbe5e5; color:#9b1c1c; }
+  .chip.neutral { background:#eceef4; color:#454b5a; }
+  .gauge { position:relative; height:10px; border-radius:5px; margin:8px 0 2px; background:linear-gradient(90deg,#c9cfe0,#eceef4 50%,#c9cfe0); }
+  .gauge s { position:absolute; top:-4px; width:4px; height:18px; margin-left:-2px; background:var(--ink); border-radius:2px; text-decoration:none; }
+  .gscale { display:flex; justify-content:space-between; font-size:11px; color:var(--muted); }
+  footer { text-align:center; font-size:12px; color:#7a8090; padding:8px 16px 28px; line-height:1.5; }
 </style>
 </head>
 <body>
 <header>
   <h1>XRP Price Monitor</h1>
-  <p>XRP in US dollars. Live price on every refresh.</p>
+  <p>XRP in US dollars, with trend and market indicators. Information only, not financial advice.</p>
 </header>
 <main>
   <div class="card" id="now">Loading...</div>
   <div class="card">
     <div class="tabs" id="tabs"></div>
-    <div id="chart"></div>
+    <div class="legend" id="legend"></div>
+    <div class="plot" id="plot"><div id="chart"></div><div class="tip" id="tip"></div></div>
     <div class="sub" id="note"></div>
+  </div>
+  <div class="card">
+    <h2>Indicators</h2>
+    <div id="inds"></div>
   </div>
 </main>
 <footer id="foot"></footer>
 <script>
-const ZONES = {buy:["Buy opportunity","#2e9e5b","#fff"], sell:["Sell zone","#c92a2a","#fff"], hold:["Hold, between your prices","#d9dce3","#1b1f2a"]};
+const COL = {price:"#3B5BDB", ma50:"#B87400", ma200:"#8E44AD", buy:"#2e9e5b", sell:"#c92a2a", grid:"#e3e6ee", text:"#5a6070"};
+const ZONES = {
+  buy:  ["Buying opportunity", "#2e9e5b", "#fff"],
+  sell: ["Selling opportunity", "#c92a2a", "#fff"],
+  hold: ["Hold, between your prices", "#d9dce3", "#1b1f2a"]};
 const usd = v => "$" + v.toFixed(4);
+const usd2 = v => "$" + v.toFixed(2);
+const sgn = v => (v >= 0 ? "+" : "") + v.toFixed(1) + "%";
 const mdy = (t, o) => new Date(t*1000).toLocaleDateString("en-US", Object.assign({timeZone:"UTC"}, o));
+const when = t => new Date(t*1000).toLocaleTimeString("en-PH",{timeZone:"Asia/Manila",hour:"numeric",minute:"2-digit"});
+const whenFull = t => new Date(t*1000).toLocaleString("en-US",{timeZone:"Asia/Manila",month:"short",day:"numeric",hour:"numeric",minute:"2-digit"});
 const get = u => fetch(u + "?" + Date.now()).then(r => { if (!r.ok) throw new Error(u); return r.json(); });
 
-Promise.all([get("xrp_data.json"), get("xrp_daily.json").catch(() => null)]).then(([d, daily]) => {
-  const z = ZONES[d.zone] || ZONES.hold;
+// ---------- indicator math (same formulas as xrp_check.py) ----------
+function smaSeries(v, n) {
+  const out = new Array(v.length).fill(null); let s = 0;
+  for (let i = 0; i < v.length; i++) { s += v[i]; if (i >= n) s -= v[i-n]; if (i >= n-1) out[i] = s / n; }
+  return out;
+}
+function rsiSeries(v, n = 14) {
+  const out = new Array(v.length).fill(null); if (v.length < n + 1) return out;
+  let ag = 0, al = 0;
+  for (let i = 1; i <= n; i++) { const d = v[i] - v[i-1]; ag += Math.max(d, 0); al += Math.max(-d, 0); }
+  ag /= n; al /= n; out[n] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+  for (let i = n + 1; i < v.length; i++) {
+    const d = v[i] - v[i-1];
+    ag = (ag * (n-1) + Math.max(d, 0)) / n; al = (al * (n-1) + Math.max(-d, 0)) / n;
+    out[i] = al === 0 ? 100 : 100 - 100 / (1 + ag / al);
+  }
+  return out;
+}
+function bandSeries(v, n = 20, k = 2) {
+  return v.map((_, i) => {
+    if (i < n - 1) return null;
+    const w = v.slice(i - n + 1, i + 1), m = w.reduce((a, b) => a + b, 0) / n;
+    const sd = Math.sqrt(w.reduce((a, b) => a + (b - m) ** 2, 0) / n);
+    return [m - k * sd, m, m + k * sd];
+  });
+}
+function decideZone(p, buy, sell, prev) {
+  if (prev === "buy" && p <= buy * 1.01) return "buy";
+  if (prev === "sell" && p >= sell * 0.99) return "sell";
+  if (p <= buy) return "buy";
+  if (p >= sell) return "sell";
+  return "hold";
+}
+const pctChg = (a, b) => (a != null && b) ? (a / b - 1) * 100 : null;
+
+Promise.all([get("xrp_data.json"), get("xrp_daily.json").catch(() => null), get("xrp_market.json").catch(() => null)])
+.then(([d, daily, market]) => {
   let live = null, cur = "7D";
-  const when = t => new Date(t*1000).toLocaleTimeString("en-PH",{timeZone:"Asia/Manila",hour:"numeric",minute:"2-digit"});
+  const hasLines = typeof d.buy === "number" && typeof d.sell === "number";
   const SRC = [
     ["Coinbase", "https://api.coinbase.com/v2/prices/XRP-USD/spot", j => +j.data.amount],
     ["Kraken", "https://api.kraken.com/0/public/Ticker?pair=XRPUSD", j => +Object.values(j.result)[0].c[0]],
@@ -68,56 +138,239 @@ Promise.all([get("xrp_data.json"), get("xrp_daily.json").catch(() => null)]).the
     }
     return null;
   }
-  const dayRows = daily ? Object.entries(daily.days).map(([k, r]) => [Date.parse(k + "T00:00:00Z")/1000, r]) : [];
 
-  // Each range gives: series [[t, price]], low, high, start price
-  const ranges = {
-    "7D": () => { const p = d.points; return {s:p, lo:Math.min(...p.map(x=>x[1])), hi:Math.max(...p.map(x=>x[1])), start:p[0][1], fmt:t=>mdy(t,{month:"short",day:"numeric"}), note:"Every 15 minutes."}; },
-    "30D": () => daily && dayRows.length >= 2 ? fromDaily(30, "Daily closes (UTC days).", t=>mdy(t,{month:"short",day:"numeric"})) : null,
-    "1Y":  () => daily && dayRows.length >= 2 ? fromDaily(365, "Daily closes (UTC days).", t=>mdy(t,{month:"short",year:"2-digit"})) : null,
-  };
-  function fromDaily(n, note, fmt) {
-    const rows = dayRows.slice(-n);
-    return {s: rows.map(([t,r]) => [t, r.c]), lo: Math.min(...rows.map(([t,r]) => r.l)), hi: Math.max(...rows.map(([t,r]) => r.h)),
-            start: rows[0][1].o, fmt, note: note + (rows.length < n ? ` Only ${rows.length} days available so far.` : "")};
+  // Daily series, with today's close replaced by the live price when there is one.
+  function buildDaily(P) {
+    if (!daily) return null;
+    const keys = Object.keys(daily.days).sort();
+    const rows = keys.map(k => Object.assign({}, daily.days[k], {k, t: Date.parse(k + "T00:00:00Z") / 1000}));
+    if (live) {
+      const today = new Date().toISOString().slice(0, 10), last = rows[rows.length - 1];
+      if (last && last.k === today) { last.c = P; last.h = Math.max(last.h, P); last.l = Math.min(last.l, P); }
+      else if (last && last.k < today) rows.push({k: today, t: Date.parse(today + "T00:00:00Z")/1000, o: P, h: P, l: P, c: P});
+    }
+    const c = rows.map(r => r.c);
+    return {rows, c, ma50: smaSeries(c, 50), ma200: smaSeries(c, 200), rsi: rsiSeries(c), bb: bandSeries(c)};
   }
 
-  function chart(R) {
-    const pts = R.s, W = 660, H = 220, pad = 44, t0 = pts[0][0], t1 = pts[pts.length-1][0];
-    const lo = Math.min(...pts.map(p=>p[1])), hi = Math.max(...pts.map(p=>p[1])), min = lo*0.99, max = hi*1.01;
-    const x = t => pad + (t - t0) / Math.max(1, t1 - t0) * (W - pad - 8);
-    const y = v => H - 22 - (v - min) / Math.max(1e-9, max - min) * (H - 40);
-    let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="XRP price chart">`;
-    [min, (min+max)/2, max].forEach(v => svg += `<line x1="${pad}" x2="${W}" y1="${y(v)}" y2="${y(v)}" stroke="#e3e6ee"/><text x="0" y="${y(v)+4}" font-size="11" fill="#5a6070">${v.toFixed(3)}</text>`);
-    svg += `<polyline fill="none" stroke="#001E62" stroke-width="2" stroke-linejoin="round" points="${pts.map(p => x(p[0]).toFixed(1)+","+y(p[1]).toFixed(1)).join(" ")}"/>`;
-    svg += `<circle cx="${x(t1)}" cy="${y(pts[pts.length-1][1])}" r="4" fill="${z[1]}"/>`;
+  function rangeOf(name, D) {
+    if (name === "7D") {
+      const p = d.points; if (!p || p.length < 2) return null;
+      return {daily:false, idx:p.map((_, i) => i), t:p.map(x => x[0]), s:p.map(x => x[1]),
+              lo:Math.min(...p.map(x => x[1])), hi:Math.max(...p.map(x => x[1])), start:p[0][1],
+              fmt:t => mdy(t, {month:"short", day:"numeric"}),
+              note:"Each point is one scheduled check (roughly hourly). Averages, bands and RSI use daily prices, so they show on the 30D and 1Y tabs."};
+    }
+    if (!D || D.rows.length < 2) return null;
+    const n = name === "30D" ? 30 : 365, from = Math.max(0, D.rows.length - n), rows = D.rows.slice(from);
+    const idx = rows.map((_, i) => from + i);
+    return {daily:true, idx, t:rows.map(r => r.t), s:rows.map(r => r.c),
+            lo:Math.min(...rows.map(r => r.l)), hi:Math.max(...rows.map(r => r.h)), start:rows[0].o,
+            fmt: n === 30 ? t => mdy(t, {month:"short", day:"numeric"}) : t => mdy(t, {month:"short", year:"2-digit"}),
+            note:"Daily closes (UTC days). Today's close is the live price." + (rows.length < n ? ` Only ${rows.length} days available so far.` : "")};
+  }
+
+  // ---------- chart ----------
+  function chart(R, D, zoneColor) {
+    const W = 400, padL = 40, padR = 6, mainTop = 14, mainH = 210, rsiTop = mainTop + mainH + 36, rsiH = 80;
+    const showRsi = R.daily, H = showRsi ? rsiTop + rsiH + 24 : mainTop + mainH + 26;
+    const n = R.s.length, t0 = R.t[0], t1 = R.t[n-1];
+    const x = t => padL + (t - t0) / Math.max(1, t1 - t0) * (W - padL - padR);
+    const ov = k => R.daily ? R.idx.map(i => D[k][i]) : null;
+    const ma50 = ov("ma50"), ma200 = ov("ma200"), bb = ov("bb"), rsi = ov("rsi");
+    // y range: price plus the overlays on screen, plus buy/sell lines if they are reasonably close
+    let vals = R.s.slice();
+    if (R.daily) { ma50.concat(ma200).forEach(v => v != null && vals.push(v)); bb.forEach(b => b && vals.push(b[0], b[2])); }
+    let lo = Math.min(...vals), hi = Math.max(...vals); const span = Math.max(hi - lo, hi * 0.02);
+    const lines = [], off = [];
+    if (hasLines) [["buy", d.buy, "Buy"], ["sell", d.sell, "Sell"]].forEach(([k, v, label]) => {
+      if (v >= lo - span * 0.4 && v <= hi + span * 0.4) { lines.push([k, v, label]); lo = Math.min(lo, v); hi = Math.max(hi, v); }
+      else off.push([k, v, label]);
+    });
+    const min = lo - (hi - lo) * 0.04, max = hi + (hi - lo) * 0.04;
+    const y = v => mainTop + mainH - (v - min) / Math.max(1e-9, max - min) * mainH;
+    const path = arr => { let s = "", pen = false; arr.forEach((v, i) => { if (v == null) { pen = false; return; } s += (pen ? "L" : "M") + x(R.t[i]).toFixed(1) + "," + y(v).toFixed(1); pen = true; }); return s; };
+
+    let svg = `<svg id="svg" viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="XRP price chart">`;
+    [min + (max-min)*0.1, (min+max)/2, max - (max-min)*0.1].forEach(v =>
+      svg += `<line x1="${padL}" x2="${W-padR}" y1="${y(v)}" y2="${y(v)}" stroke="${COL.grid}"/><text x="${padL-6}" y="${y(v)+4}" font-size="11" text-anchor="end" fill="${COL.text}">${v.toFixed(3)}</text>`);
+    if (R.daily) {
+      const up = [], dn = [];
+      bb.forEach((b, i) => { if (b) { up.push(x(R.t[i]).toFixed(1) + "," + y(b[2]).toFixed(1)); dn.unshift(x(R.t[i]).toFixed(1) + "," + y(b[0]).toFixed(1)); } });
+      if (up.length > 1) svg += `<polygon points="${up.concat(dn).join(" ")}" fill="rgba(59,91,219,.10)"/>`;
+      svg += `<path d="${path(ma200)}" fill="none" stroke="${COL.ma200}" stroke-width="2"/>`;
+      svg += `<path d="${path(ma50)}" fill="none" stroke="${COL.ma50}" stroke-width="2"/>`;
+    }
+    lines.forEach(([k, v, label]) => {
+      svg += `<line x1="${padL}" x2="${W-padR}" y1="${y(v)}" y2="${y(v)}" stroke="${COL[k]}" stroke-width="2" stroke-dasharray="6 5"/>`;
+      svg += `<text x="${padL+4}" y="${y(v) + (k === "buy" ? 14 : -5)}" font-size="11" font-weight="bold" fill="${COL[k]}">${label} ${usd2(v)}</text>`;
+    });
+    off.forEach(([k, v, label]) => {
+      const top = v > max;
+      svg += `<text x="${W-padR}" y="${top ? mainTop + 2 : mainTop + mainH - 4}" font-size="11" font-weight="bold" text-anchor="end" fill="${COL[k]}">${label} ${usd2(v)} ${top ? "↑" : "↓"} off chart</text>`;
+    });
+    svg += `<path d="${path(R.s)}" fill="none" stroke="${COL.price}" stroke-width="2" stroke-linejoin="round"/>`;
+    svg += `<circle cx="${x(t1)}" cy="${y(R.s[n-1])}" r="5" fill="${zoneColor}" stroke="#fff" stroke-width="2"/>`;
+    const axisY = showRsi ? mainTop + mainH + 16 : H - 6;
     for (let i = 0; i < 5; i++) { const t = t0 + (t1 - t0) * i / 4;
-      svg += `<text x="${x(t)}" y="${H-6}" font-size="10" text-anchor="${i==0?'start':i==4?'end':'middle'}" fill="#5a6070">${R.fmt(t)}</text>`; }
-    return svg + "</svg>";
+      svg += `<text x="${x(t)}" y="${axisY}" font-size="10" text-anchor="${i==0?'start':i==4?'end':'middle'}" fill="${COL.text}">${R.fmt(t)}</text>`; }
+    let ry = null;
+    if (showRsi) {
+      ry = v => rsiTop + rsiH - v / 100 * rsiH;
+      svg += `<text x="${padL}" y="${rsiTop - 6}" font-size="11" font-weight="bold" fill="${COL.text}">RSI (14-day)</text>`;
+      svg += `<rect x="${padL}" y="${ry(70)}" width="${W-padL-padR}" height="${ry(30)-ry(70)}" fill="#f1f3f8"/>`;
+      [[30, "30 oversold"], [70, "70 overbought"]].forEach(([v, l]) =>
+        svg += `<line x1="${padL}" x2="${W-padR}" y1="${ry(v)}" y2="${ry(v)}" stroke="#b9bfcf" stroke-dasharray="4 4"/><text x="${padL-6}" y="${ry(v)+4}" font-size="10" text-anchor="end" fill="${COL.text}">${v}</text>`);
+      const rp = rsi.map((v, i) => v == null ? null : [x(R.t[i]), ry(v)]);
+      let s = "", pen = false; rp.forEach(p => { if (!p) { pen = false; return; } s += (pen ? "L" : "M") + p[0].toFixed(1) + "," + p[1].toFixed(1); pen = true; });
+      svg += `<path d="${s}" fill="none" stroke="${COL.price}" stroke-width="2"/>`;
+    }
+    svg += `<line id="xh" y1="${mainTop}" y2="${showRsi ? rsiTop + rsiH : mainTop + mainH}" stroke="#7a8090" stroke-width="1" visibility="hidden"/>`;
+    svg += `<circle id="xd" r="5" fill="${COL.price}" stroke="#fff" stroke-width="2" visibility="hidden"/>`;
+    svg += `<rect id="hit" x="${padL}" y="0" width="${W-padL-padR}" height="${H}" fill="transparent"/>`;
+    svg += "</svg>";
+    return {svg, W, x, y, n, ma50, ma200, rsi, bb};
   }
 
+  function wireHover(R, G) {
+    const svgEl = document.getElementById("svg"), tip = document.getElementById("tip"), plot = document.getElementById("plot");
+    const xh = document.getElementById("xh"), xd = document.getElementById("xd");
+    const move = e => {
+      const box = svgEl.getBoundingClientRect(), sx = (e.clientX - box.left) / box.width * G.W;
+      let i = 0, best = 1e9; R.t.forEach((t, j) => { const dx = Math.abs(G.x(t) - sx); if (dx < best) { best = dx; i = j; } });
+      const px = G.x(R.t[i]), py = G.y(R.s[i]);
+      xh.setAttribute("x1", px); xh.setAttribute("x2", px); xh.setAttribute("visibility", "visible");
+      xd.setAttribute("cx", px); xd.setAttribute("cy", py); xd.setAttribute("visibility", "visible");
+      let h = `<b>${R.daily ? mdy(R.t[i], {month:"short", day:"numeric", year:"numeric"}) : whenFull(R.t[i]) + " PHT"}</b><br>Price ${usd(R.s[i])}`;
+      if (R.daily) {
+        if (G.ma50[i] != null) h += `<br>50-day avg ${usd(G.ma50[i])}`;
+        if (G.ma200[i] != null) h += `<br>200-day avg ${usd(G.ma200[i])}`;
+        if (G.rsi[i] != null) h += `<br>RSI ${G.rsi[i].toFixed(0)}`;
+      }
+      tip.innerHTML = h; tip.style.display = "block";
+      const left = px / G.W * box.width, tw = tip.offsetWidth;
+      tip.style.left = (left + 12 + tw > box.width ? left - tw - 12 : left + 12) + "px";
+    };
+    const hide = () => { tip.style.display = "none"; xh.setAttribute("visibility", "hidden"); xd.setAttribute("visibility", "hidden"); };
+    const hit = document.getElementById("hit");
+    hit.addEventListener("pointermove", move); hit.addEventListener("pointerdown", move);
+    hit.addEventListener("pointerleave", hide); plot.addEventListener("pointercancel", hide);
+  }
+
+  function legend(R) {
+    const items = [[COL.price, "Price", ""]];
+    if (R.daily) items.push([COL.ma50, "50-day average", ""], [COL.ma200, "200-day average", ""], ["", "Bollinger band", "band"]);
+    if (hasLines) items.push([COL.buy, "Your buy price", "dash"], [COL.sell, "Your sell price", "dash"]);
+    document.getElementById("legend").innerHTML = items.map(([c, l, cls]) => `<span><i class="${cls}" style="border-color:${c}"></i>${l}</span>`).join("");
+  }
+
+  // ---------- indicators card ----------
+  const chip = (lean, text) => `<span class="chip ${lean}">${text || (lean === "buy" ? "Leans buy" : lean === "sell" ? "Leans sell" : "Neutral")}</span>`;
+  function indicators(P, D) {
+    const out = {leans: {}, html: ""};
+    if (!D || D.rows.length < 30) { out.html = `<div class="sub">Indicators appear once enough daily history is saved.</div>`; return out; }
+    const L = D.rows.length - 1, ma50 = D.ma50[L], ma200 = D.ma200[L], r = D.rsi[L], b = D.bb[L];
+    let h = "";
+    if (ma200 != null) {
+      const up = P >= ma200, dist = (P / ma200 - 1) * 100;
+      h += row("Trend (200-day average)", chip("neutral", up ? "↑ Uptrend" : "↓ Downtrend"),
+        `Price is ${Math.abs(dist).toFixed(1)}% ${up ? "above" : "below"} the 200-day average of ${usd(ma200)}.`,
+        "The 200-day average shows the long-term direction. Above it is usually read as an uptrend, below it as a downtrend.");
+    }
+    if (ma50 != null && ma200 != null) {
+      const golden = ma50 >= ma200; let since = null;
+      for (let i = L; i > 0; i--) { const a = D.ma50[i-1], c = D.ma200[i-1]; if (a == null || c == null) break; if ((a >= c) !== golden) { since = D.rows[i].t; break; } }
+      h += row("50-day vs 200-day average", chip("neutral", golden ? "Golden cross" : "Death cross"),
+        `The 50-day average (${usd(ma50)}) is ${golden ? "above" : "below"} the 200-day average (${usd(ma200)})` + (since ? ` since ${mdy(since, {month:"short", day:"numeric", year:"numeric"})}.` : "."),
+        golden ? "A golden cross is often read as a sign of strength." : "A death cross is often read as a sign of weakness.");
+    }
+    if (r != null) {
+      const lean = r < 30 ? "buy" : r > 70 ? "sell" : "neutral"; out.leans.rsi = lean;
+      h += row("RSI (14-day)", chip(lean), `RSI is ${r.toFixed(0)}${r < 30 ? ", oversold" : r > 70 ? ", overbought" : ", in the normal range"}.`,
+        "Measures how fast the price has moved, from 0 to 100. Below 30 means it fell fast (oversold); above 70 means it rose fast (overbought).");
+    }
+    if (b) {
+      const lean = P <= b[0] ? "buy" : P >= b[2] ? "sell" : "neutral"; out.leans.bands = lean;
+      const pos = (P - b[0]) / Math.max(1e-9, b[2] - b[0]);
+      const where = P <= b[0] ? "at or below the lower band" : P >= b[2] ? "at or above the upper band" : pos < 0.3 ? "near the lower band" : pos > 0.7 ? "near the upper band" : "in the middle of the band";
+      h += row("Bollinger Bands (20-day)", chip(lean), `Price is ${where} (${usd(b[0])} to ${usd(b[2])}).`,
+        "The band covers the usual range of recent prices. Touching the lower edge means an unusually large drop; the upper edge, an unusually large rise.");
+    }
+    if (market && market.btc) {
+      const bk = Object.keys(market.btc).sort(), bc = bk.map(k => market.btc[k]);
+      const x7 = pctChg(P, D.c[L-7]), x30 = pctChg(P, D.c[L-30]);
+      const b7 = bc.length >= 8 ? pctChg(bc[bc.length-1], bc[bc.length-8]) : null, b30 = bc.length >= 31 ? pctChg(bc[bc.length-1], bc[bc.length-31]) : null;
+      if (x7 != null && b7 != null) {
+        const diff = x7 - b7, tag = Math.abs(diff) < 2 ? "Moving with BTC" : diff < 0 ? "Weaker than BTC" : "Stronger than BTC";
+        h += row("Compared with Bitcoin", chip("neutral", tag),
+          `7 days: XRP ${sgn(x7)}, Bitcoin ${sgn(b7)}.` + (x30 != null && b30 != null ? ` 30 days: XRP ${sgn(x30)}, Bitcoin ${sgn(b30)}.` : ""),
+          "XRP often follows Bitcoin. This shows whether a move is about XRP itself or the whole crypto market.");
+      }
+    }
+    if (market && market.fng) {
+      const fk = Object.keys(market.fng).sort();
+      if (fk.length) {
+        const [v, label] = market.fng[fk[fk.length-1]], wk = fk.length >= 8 ? market.fng[fk[fk.length-8]][0] : null;
+        const lean = v <= 25 ? "buy" : v >= 75 ? "sell" : "neutral"; out.leans.fng = lean;
+        h += row("Fear and Greed Index", chip(lean), `${v} out of 100, ${label}.` + (wk != null ? ` A week ago: ${wk}.` : ""),
+          "Daily mood of the whole crypto market. Extreme fear has often come near price lows, extreme greed near highs.",
+          `<div class="gauge"><s style="left:${v}%"></s></div><div class="gscale"><span>0 Extreme fear</span><span>100 Extreme greed</span></div>`);
+      }
+    }
+    out.html = h;
+    return out;
+  }
+  function row(name, chipHtml, val, why, extra) {
+    return `<div class="ind"><div class="top"><span class="name">${name}</span>${chipHtml}</div><div class="val">${val}</div>${extra || ""}<div class="why">${why}</div></div>`;
+  }
+
+  // ---------- page ----------
   function show(name) {
-    const R = ranges[name](); if (!R) return;
-    cur = name; const P = live ? live.price : d.price, lo = Math.min(R.lo, P), hi = Math.max(R.hi, P);
-    const chg = (P - R.start) / R.start * 100, up = chg >= 0;
+    const P = live ? live.price : d.price, D = buildDaily(P), R = rangeOf(name, D); if (!R) return;
+    cur = name;
+    const zone = hasLines ? decideZone(P, d.buy, d.sell, d.zone) : (d.zone || "hold"), z = ZONES[zone] || ZONES.hold;
+    const I = indicators(P, D), lv = Object.values(I.leans), nb = lv.filter(v => v === "buy").length, ns = lv.filter(v => v === "sell").length;
+    let verdict = "";
+    if (lv.length) {
+      if (nb >= 2) verdict = `<b>Indicators lean toward buying</b> (${nb} of ${lv.length} signals).`;
+      else if (ns >= 2) verdict = `<b>Indicators lean toward selling</b> (${ns} of ${lv.length} signals).`;
+      else verdict = `<b>Indicators are mixed or neutral</b> (${nb} lean buy, ${ns} lean sell, of ${lv.length}).`;
+      if (zone === "buy" && nb >= 2) verdict += " They agree with your buy price.";
+      if (zone === "sell" && ns >= 2) verdict += " They agree with your sell price.";
+    }
+    let lineText = "";
+    if (hasLines) {
+      if (zone === "buy") lineText = `At or below your buy price of ${usd2(d.buy)}.`;
+      else if (zone === "sell") lineText = `At or above your sell price of ${usd2(d.sell)}.`;
+      else lineText = `${((P / d.buy - 1) * 100).toFixed(1)}% above your buy price (${usd2(d.buy)}), ${((1 - P / d.sell) * 100).toFixed(1)}% below your sell price (${usd2(d.sell)}).`;
+    }
+    const hi = Math.max(R.hi, P), lo = Math.min(R.lo, P), chg = (P - R.start) / R.start * 100, up = chg >= 0;
     document.getElementById("now").innerHTML =
-      `<div class="price">${usd(P)}</div><span class="zone" style="background:${z[1]};color:${z[2]}">${z[0]}</span>
-       <div class="row"><div>${name} change<b style="color:${up?'#2e9e5b':'#c92a2a'}">${up?'+':''}${chg.toFixed(2)}%</b></div>
+      `<div class="price">${usd(P)}</div>
+       <span class="zone" style="background:${z[1]};color:${z[2]}">${z[0]}</span><span class="nfa">NFA: not financial advice</span>
+       ${lineText ? `<div class="sub" style="color:#1b1f2a;font-size:14px">${lineText}</div>` : ""}
+       ${verdict ? `<div class="verdict">${verdict}</div>` : ""}
+       <div class="row"><div>${name} change<b style="color:${up?'#1d6b3d':'#9b1c1c'}">${up?'+':''}${chg.toFixed(2)}%</b></div>
        <div>${name} low<b>${usd(lo)}</b></div><div>${name} high<b>${usd(hi)}</b></div></div>
-       <div class="sub">${live ? `Live price from ${live.source} at ${when(live.t)} PHT.` : `Last saved check at ${when(d.updated)} PHT. Live price not available right now.`}</div>
-       <div class="sub">The zone shown is from the last saved check at ${when(d.updated)} PHT, since your buy and sell prices are kept private. Alerts are sent by the scheduled check, not by this page.</div>`;
-    document.getElementById("chart").innerHTML = chart(R);
+       <div class="sub">${live ? `Live price from ${live.source} at ${when(live.t)} PHT.` : `Last saved check at ${when(d.updated)} PHT. Live price not available right now.`}
+       Push alerts come from the scheduled check (last one at ${when(d.updated)} PHT), not from this page.</div>`;
+    const G = chart(R, D, z[1]);
+    document.getElementById("chart").innerHTML = G.svg;
+    document.getElementById("tip").style.display = "none";
+    wireHover(R, G); legend(R);
     document.getElementById("note").textContent = R.note;
+    document.getElementById("inds").innerHTML = I.html;
     [...document.querySelectorAll("#tabs button")].forEach(b => b.classList.toggle("on", b.textContent === name));
   }
 
-  const tabs = document.getElementById("tabs");
-  Object.keys(ranges).forEach(n => { if (!ranges[n]()) return;
+  const tabs = document.getElementById("tabs"), D0 = buildDaily(d.price);
+  ["7D", "30D", "1Y"].forEach(n => { if (!rangeOf(n, D0)) return;
     const b = document.createElement("button"); b.textContent = n; b.onclick = () => show(n); tabs.appendChild(b); });
   show("7D");
   const refresh = async () => { const l = await fetchLive(); if (l) live = l; show(cur); };
   refresh(); setInterval(refresh, 30000);
-  document.getElementById("foot").textContent = "Updated " + new Date(d.updated*1000).toLocaleString("en-PH",{timeZone:"Asia/Manila"}) + " PHT. Information only, not financial advice.";
+  document.getElementById("foot").innerHTML = "Updated " + new Date(d.updated*1000).toLocaleString("en-PH",{timeZone:"Asia/Manila"}) +
+    " PHT.<br>Information only. Not financial advice (NFA). Indicators describe past prices and do not predict the future.";
 }).catch(e => document.getElementById("now").textContent = "No data yet. It appears after the first check runs. (" + e + ")");
 </script>
 </body>
